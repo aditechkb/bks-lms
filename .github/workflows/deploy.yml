@@ -1,0 +1,49 @@
+name: Deploy WordPress Theme to Hostinger
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.HOSTINGER_PORT }} ${{ secrets.HOSTINGER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy Theme
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+          -p ${{ secrets.HOSTINGER_PORT }} \
+          ${{ secrets.HOSTINGER_USERNAME }}@${{ secrets.HOSTINGER_HOST }} << 'EOF'
+
+          echo "🚀 Starting deployment..."
+
+          THEME_PATH="domains/kameswari.net/public_html/wp-content/themes/bks-lms"
+
+          cd domains/kameswari.net/public_html/wp-content/themes
+
+          # First time setup
+          if [ ! -d "bks-lms" ]; then
+            echo "📦 Cloning theme for first time..."
+            git clone https://github.com/aditechkb/bks-lms.git
+          fi
+
+          cd bks-lms
+
+          echo "🔄 Syncing latest code..."
+          git reset --hard
+          git pull origin main
+
+          echo "✅ Theme deployed successfully"
+
+          EOF
