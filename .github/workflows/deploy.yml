@@ -28,7 +28,7 @@ jobs:
 
           echo "🚀 Starting deployment..."
 
-          cd public_html/bks-lms || exit
+          cd domains//kameswari.net/public_html/wp-content/themes/bks-lms || exit
 
           echo "📥 Pulling latest code..."
           git reset --hard
