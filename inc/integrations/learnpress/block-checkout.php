@@ -80,34 +80,45 @@ add_filter('learn-press/checkout/enable-guest', '__return_false');
 add_filter('learn-press/checkout/enable-login', '__return_false');
 add_filter('learn-press/checkout/enable-register', '__return_false');
 
+/**
+ * Integration to bridge LearnPress and WooCommerce
+ */
 
-// 6. Remove the default LearnPress price
-add_filter( 'learn-press/course-price-html', 'bks_replace_lp_price_with_woo', 100, 2 );
+add_action('wp', 'bks_init_learnpress_woo_bridge');
 
-function bks_replace_lp_price_with_woo( $price_html, $course ) {
-    // Get the WooCommerce Product ID from your custom mapping table
-    $woo_product_id = bks_get_mapped_woo_id( $course->get_id() );
+function bks_init_learnpress_woo_bridge() {
+    // Only run this on single course pages
+    if ( ! is_singular( 'lp_course' ) ) {
+        return;
+    }
+
+    // 1. Hide the native LearnPress price
+    // We use a high priority (100) to ensure we override LP defaults
+    add_filter( 'learn-press/course-price-html', '__return_empty_string', 100 );
+
+    // 2. Remove the standard LearnPress buttons
+    remove_action( 'learn-press/course-buttons', 'learn_press_course_purchase_button', 10 );
+    remove_action( 'learn-press/course-buttons', 'learn_press_course_enroll_button', 10 );
+
+    // 3. Add our Custom WooCommerce Button
+    add_action( 'learn-press/course-buttons', 'bks_render_woo_buy_button', 10 );
+}
+
+function bks_render_woo_buy_button() {
+    $course_id = get_the_ID();
+    
+    // Fetch from your custom mapping table
+    $woo_product_id = bks_get_woo_product_id_by_course( $course_id );
 
     if ( $woo_product_id ) {
         $product = wc_get_product( $woo_product_id );
         if ( $product ) {
-            // Return the WooCommerce price HTML instead
-            return $product->get_price_html();
+            echo '<div class="bks-woo-wrapper">';
+            echo '<p class="price">' . $product->get_price_html() . '</p>';
+            echo do_shortcode( '[add_to_cart id="' . $woo_product_id . '"]' );
+            echo '</div>';
         }
-    }
-    return $price_html;
-}
-
-// 7. Replace the Purchase/Enroll Button
-remove_action( 'learn-press/course-buttons', 'learn_press_course_purchase_button', 10 );
-add_action( 'learn-press/course-buttons', 'bks_add_woo_buy_button', 10 );
-
-function bks_add_woo_buy_button() {
-    $course = learn_press_get_course();
-    $woo_id = bks_get_mapped_woo_id( $course->get_id() );
-
-    if ( $woo_id ) {
-        // Output the WooCommerce Add to Cart button/shortcode
-        echo do_shortcode( '[add_to_cart id="' . $woo_id . '"]' );
+    } else {
+        echo '<p>Course not currently available for purchase.</p>';
     }
 }
