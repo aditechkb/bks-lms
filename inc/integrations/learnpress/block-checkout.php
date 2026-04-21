@@ -80,59 +80,62 @@ add_filter('learn-press/checkout/enable-guest', '__return_false');
 add_filter('learn-press/checkout/enable-login', '__return_false');
 add_filter('learn-press/checkout/enable-register', '__return_false');
 
+
 /**
- * Integration to bridge LearnPress and WooCommerce
+ * 6. REMOVE ALL LEARNPRESS PRICE BUTTONS
  */
+add_action('init', function () {
+
+    // Remove LearnPress purchase UI
+    remove_all_actions('learn-press/course-buttons');
+
+    // Optional: remove course meta pricing blocks
+    remove_all_actions('learn-press/course-meta-secondary-left');
+
+});
 
 
+/**
+ * 6. INJECT WOOCOMMERCE PRICE INTO COURSE PAGE
+ */
+add_action('learn-press/course-content-summary', function () {
 
-// Use the 'wp' hook to start the buffer only on course pages
-add_action('wp', 'bks_start_course_buffer');
-
-function bks_start_course_buffer() {
-    if (is_singular('lp_course')) {
-        ob_start('bks_modify_course_output');
-    }
-}
-
-// This function processes the entire HTML of the page before it's sent to the browser
-function bks_modify_course_output($html) {
     $course_id = get_the_ID();
-    $woo_product_id = bks_get_woo_product_id_by_course($course_id);
+    $product_id = bks_get_product_id_by_course($course_id);
 
-    if (!$woo_product_id) {
-        return $html;
+    if (!$product_id) {
+        return;
     }
 
-    $product = wc_get_product($woo_product_id);
+    $product = wc_get_product($product_id);
+
     if (!$product) {
-        return $html;
+        return;
     }
 
-    // 1. Define what we want to replace (LP price and buttons)
-    // We look for common LearnPress CSS classes
-    $woo_price = '<span class="woo-price">' . $product->get_price_html() . '</span>';
-    $woo_button = do_shortcode('[add_to_cart id="' . $woo_product_id . '"]');
-    
-    $replacement_html = '<div class="bks-custom-checkout">' . $woo_price . $woo_button . '</div>';
+    echo '<div class="bks-course-purchase-box">';
 
-    // 2. Use Regex to find and replace the LearnPress price/purchase container
-    // This targets the most common LP container for buttons and prices
-    $pattern = '/<div class="course-payment">.*?<\/div>/s'; 
-    
-    // If the above class doesn't match your version, try the general 'lp-course-buttons'
-    if (!preg_match($pattern, $html)) {
-        $pattern = '/<div class="lp-course-buttons">.*?<\/div>/s';
-    }
+    // PRICE
+    echo '<div class="price">';
+    echo $product->get_price_html();
+    echo '</div>';
 
-    $html = preg_replace($pattern, $replacement_html, $html);
+    // ADD TO CART BUTTON
+    echo '<div class="add-to-cart">';
 
-    return $html;
-}
+    echo apply_filters(
+        'woocommerce_loop_add_to_cart_link',
+        sprintf(
+            '<a href="%s" data-quantity="1" class="button add_to_cart_button" data-product_id="%d">%s</a>',
+            esc_url($product->add_to_cart_url()),
+            $product_id,
+            __('Add to cart', 'woocommerce')
+        ),
+        $product
+    );
 
-// Ensure the buffer is flushed
-add_action('shutdown', function() {
-    if (ob_get_level() > 0) {
-        ob_end_flush();
-    }
-}, 0);
+    echo '</div>';
+
+    echo '</div>';
+
+}, 5);
