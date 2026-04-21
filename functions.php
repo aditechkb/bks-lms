@@ -67,3 +67,5 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
         // echo '<!-- BKS LMS Child Theme Loaded -->';
     });
 }
+
+require_once get_stylesheet_directory() . '/inc/integrations/learnpress-block-checkout.php';
