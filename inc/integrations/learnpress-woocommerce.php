@@ -2,33 +2,36 @@
 defined('ABSPATH') || exit;
 
 /**
- * 1. BLOCK checkout at LearnPress engine level (SAFE)
+ * 🚫 HARD BLOCK LEARNPRESS CHECKOUT COMPLETELY
+ * (UI + AJAX + API safe)
  */
-add_action('learn-press/before-checkout', function () {
 
-    // Stop checkout cleanly
-    learn_press_add_message([
-        'status'  => 'error',
-        'content' => 'LearnPress checkout is disabled. Please use WooCommerce checkout.'
-    ]);
+add_action('init', function () {
 
-    // prevent further processing safely
-    remove_all_actions('learn-press/process-checkout');
+    if (!class_exists('LP_Checkout')) {
+        return;
+    }
+
+    /**
+     * STEP 1: Block validation stage
+     */
+    add_action('learn-press/validate-checkout-fields', function () {
+        wp_send_json([
+            'result'  => 'fail',
+            'message' => 'LearnPress checkout is disabled. Please use WooCommerce checkout.'
+        ]);
+        exit;
+    }, 0);
+
+    /**
+     * STEP 2: Block payment validation
+     */
+    add_action('learn-press/validate-payment', function () {
+        wp_send_json([
+            'result'  => 'fail',
+            'message' => 'Checkout disabled.'
+        ]);
+        exit;
+    }, 0);
 
 }, 1);
-
-
-/**
- * 2. BLOCK payment methods (prevents bypass)
- */
-add_filter('learn-press/payment-methods', function () {
-    return [];
-});
-
-
-/**
- * 3. DISABLE checkout options UI
- */
-add_filter('learn-press/checkout/enable-guest', '__return_false');
-add_filter('learn-press/checkout/enable-login', '__return_false');
-add_filter('learn-press/checkout/enable-register', '__return_false');
