@@ -68,5 +68,4 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
     });
 }
 
-require_once get_stylesheet_directory() . '/inc/integrations/learnpress/block-checkout.php';
-require_once get_stylesheet_directory() . '/inc/integrations/woocommerce/product-course-mapping.php';
+require_once get_stylesheet_directory() . '/inc/core/bootstrap.php';
