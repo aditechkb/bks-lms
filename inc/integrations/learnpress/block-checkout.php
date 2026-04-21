@@ -81,61 +81,33 @@ add_filter('learn-press/checkout/enable-login', '__return_false');
 add_filter('learn-press/checkout/enable-register', '__return_false');
 
 
-/**
- * 6. REMOVE ALL LEARNPRESS PRICE BUTTONS
- */
-add_action('init', function () {
+// 6. Remove the default LearnPress price
+add_filter( 'learn-press/course-price-html', 'bks_replace_lp_price_with_woo', 100, 2 );
 
-    // Remove LearnPress purchase UI
-    remove_all_actions('learn-press/course-buttons');
+function bks_replace_lp_price_with_woo( $price_html, $course ) {
+    // Get the WooCommerce Product ID from your custom mapping table
+    $woo_product_id = bks_get_mapped_woo_id( $course->get_id() );
 
-    // Optional: remove course meta pricing blocks
-    remove_all_actions('learn-press/course-meta-secondary-left');
-
-});
-
-
-/**
- * 6. INJECT WOOCOMMERCE PRICE INTO COURSE PAGE
- */
-add_action('learn-press/course-content-summary', function () {
-
-    $course_id = get_the_ID();
-    $product_id = bks_get_product_id_by_course($course_id);
-
-    if (!$product_id) {
-        return;
+    if ( $woo_product_id ) {
+        $product = wc_get_product( $woo_product_id );
+        if ( $product ) {
+            // Return the WooCommerce price HTML instead
+            return $product->get_price_html();
+        }
     }
+    return $price_html;
+}
 
-    $product = wc_get_product($product_id);
+// 7. Replace the Purchase/Enroll Button
+remove_action( 'learn-press/course-buttons', 'learn_press_course_purchase_button', 10 );
+add_action( 'learn-press/course-buttons', 'bks_add_woo_buy_button', 10 );
 
-    if (!$product) {
-        return;
+function bks_add_woo_buy_button() {
+    $course = learn_press_get_course();
+    $woo_id = bks_get_mapped_woo_id( $course->get_id() );
+
+    if ( $woo_id ) {
+        // Output the WooCommerce Add to Cart button/shortcode
+        echo do_shortcode( '[add_to_cart id="' . $woo_id . '"]' );
     }
-
-    echo '<div class="bks-course-purchase-box">';
-
-    // PRICE
-    echo '<div class="price">';
-    echo $product->get_price_html();
-    echo '</div>';
-
-    // ADD TO CART BUTTON
-    echo '<div class="add-to-cart">';
-
-    echo apply_filters(
-        'woocommerce_loop_add_to_cart_link',
-        sprintf(
-            '<a href="%s" data-quantity="1" class="button add_to_cart_button" data-product_id="%d">%s</a>',
-            esc_url($product->add_to_cart_url()),
-            $product_id,
-            __('Add to cart', 'woocommerce')
-        ),
-        $product
-    );
-
-    echo '</div>';
-
-    echo '</div>';
-
-}, 5);
+}
