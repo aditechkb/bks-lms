@@ -84,41 +84,55 @@ add_filter('learn-press/checkout/enable-register', '__return_false');
  * Integration to bridge LearnPress and WooCommerce
  */
 
-add_action('wp', 'bks_init_learnpress_woo_bridge');
 
-function bks_init_learnpress_woo_bridge() {
-    // Only run this on single course pages
-    if ( ! is_singular( 'lp_course' ) ) {
-        return;
+
+// Use the 'wp' hook to start the buffer only on course pages
+add_action('wp', 'bks_start_course_buffer');
+
+function bks_start_course_buffer() {
+    if (is_singular('lp_course')) {
+        ob_start('bks_modify_course_output');
     }
-
-    // 1. Hide the native LearnPress price
-    // We use a high priority (100) to ensure we override LP defaults
-    add_filter( 'learn-press/course-price-html', '__return_empty_string', 100 );
-
-    // 2. Remove the standard LearnPress buttons
-    remove_action( 'learn-press/course-buttons', 'learn_press_course_purchase_button', 10 );
-    remove_action( 'learn-press/course-buttons', 'learn_press_course_enroll_button', 10 );
-
-    // 3. Add our Custom WooCommerce Button
-    add_action( 'learn-press/course-buttons', 'bks_render_woo_buy_button', 10 );
 }
 
-function bks_render_woo_buy_button() {
+// This function processes the entire HTML of the page before it's sent to the browser
+function bks_modify_course_output($html) {
     $course_id = get_the_ID();
-    
-    // Fetch from your custom mapping table
-    $woo_product_id = bks_get_woo_product_id_by_course( $course_id );
+    $woo_product_id = bks_get_woo_product_id_by_course($course_id);
 
-    if ( $woo_product_id ) {
-        $product = wc_get_product( $woo_product_id );
-        if ( $product ) {
-            echo '<div class="bks-woo-wrapper">';
-            echo '<p class="price">' . $product->get_price_html() . '</p>';
-            echo do_shortcode( '[add_to_cart id="' . $woo_product_id . '"]' );
-            echo '</div>';
-        }
-    } else {
-        echo '<p>Course not currently available for purchase.</p>';
+    if (!$woo_product_id) {
+        return $html;
     }
+
+    $product = wc_get_product($woo_product_id);
+    if (!$product) {
+        return $html;
+    }
+
+    // 1. Define what we want to replace (LP price and buttons)
+    // We look for common LearnPress CSS classes
+    $woo_price = '<span class="woo-price">' . $product->get_price_html() . '</span>';
+    $woo_button = do_shortcode('[add_to_cart id="' . $woo_product_id . '"]');
+    
+    $replacement_html = '<div class="bks-custom-checkout">' . $woo_price . $woo_button . '</div>';
+
+    // 2. Use Regex to find and replace the LearnPress price/purchase container
+    // This targets the most common LP container for buttons and prices
+    $pattern = '/<div class="course-payment">.*?<\/div>/s'; 
+    
+    // If the above class doesn't match your version, try the general 'lp-course-buttons'
+    if (!preg_match($pattern, $html)) {
+        $pattern = '/<div class="lp-course-buttons">.*?<\/div>/s';
+    }
+
+    $html = preg_replace($pattern, $replacement_html, $html);
+
+    return $html;
 }
+
+// Ensure the buffer is flushed
+add_action('shutdown', function() {
+    if (ob_get_level() > 0) {
+        ob_end_flush();
+    }
+}, 0);
